@@ -1,9 +1,8 @@
 package com.kgwb.fxgui;
 
 import com.kgwb.LongRunningTask;
-import com.kgwb.model.MiniLinkDeviceTmprWrapper;
-import com.kgwb.model.TemperatureModel;
-import javafx.beans.property.SimpleIntegerProperty;
+import com.kgwb.model.MiniLinkDeviceVerifyWrapper;
+import com.kgwb.model.VerfyModel;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
@@ -17,7 +16,6 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.Priority;
-import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
@@ -28,8 +26,6 @@ import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import java.io.*;
 import java.net.InetAddress;
 import java.net.URL;
-import java.text.DecimalFormat;
-import java.text.NumberFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,7 +36,7 @@ import java.util.concurrent.*;
 public class Controller implements Initializable {
 
     private int proActiveVal = 10;
-    private TableView<TemperatureModel> tableView;
+    private TableView<VerfyModel> tableView;
     private ScheduledExecutorService ses;
     private ScheduledFuture<?> scheduledFuture;
 
@@ -109,42 +105,13 @@ public class Controller implements Initializable {
                 row.createCell(j).setCellValue(tableView.getColumns().get(j).getText());
             }
 
-            SheetConditionalFormatting sheetCF = spreadsheet.getSheetConditionalFormatting();
-
             for (int r = 0; r < itemSize; r++) {
                 row = spreadsheet.createRow(r + 1);
                 for (int c = 0; c < colSize; c++) {
-                    if (colSize >= ((c + 1) * 3 + 1)) {
-                        ConditionalFormattingRule criticalRule = sheetCF.createConditionalFormattingRule(
-                                ComparisonOperator.GE,
-                                String.format("%s%d-%d", getExcelColumnName((c + 1) * 3 + 3), r + 2, proActiveVal));//F2-20
-                        PatternFormatting criticalPatternFmt = criticalRule.createPatternFormatting();
-                        criticalPatternFmt.setFillBackgroundColor(IndexedColors.RED.index);
-                        ConditionalFormattingRule majorRule = sheetCF.createConditionalFormattingRule(
-                                ComparisonOperator.BETWEEN,
-                                String.format("%s%d-%d", getExcelColumnName((c + 1) * 3 + 2), r + 2, proActiveVal), //E2-20
-                                String.format("%s%d-%d", getExcelColumnName((c + 1) * 3 + 3), r + 2, proActiveVal));//F2-20
-                        PatternFormatting majorPatternFmt = majorRule.createPatternFormatting();
-                        majorPatternFmt.setFillBackgroundColor(IndexedColors.ORANGE.index);
-
-                        ConditionalFormattingRule[] cfRules = {
-                                criticalRule,
-                                majorRule,
-                              //minorRule
-                        };
-
-                        CellRangeAddress[] regions = {CellRangeAddress.valueOf(String.format("%s%d",
-                                getExcelColumnName((c + 1) * 3 + 1), r + 2))}; //D2
-                        sheetCF.addConditionalFormatting(regions, cfRules);
-                    }
 
                     Object fxCellData = tableView.getColumns().get(c).getCellData(r);
                     if (fxCellData != null) {
-                        if (c >= 3) {
-                            row.createCell(c, CellType.NUMERIC).setCellValue(Integer.parseInt(fxCellData.toString()));
-                            spreadsheet.setColumnWidth(c, 255 * 4);
-                        } else
-                            row.createCell(c).setCellValue(fxCellData.toString());
+                        row.createCell(c).setCellValue(fxCellData.toString());
                     } else {
                         row.createCell(c).setCellValue("");
                     }
@@ -308,7 +275,7 @@ public class Controller implements Initializable {
         alert.showAndWait();
     }
 
-    private void populateTable(List<MiniLinkDeviceTmprWrapper> objectList) {
+    private void populateTable(List<MiniLinkDeviceVerifyWrapper> objectList) {
 //        tableView.getItems().clear();
         tableView.getColumns().clear();
         tableView.setPlaceholder(new Label("Loading..."));
@@ -319,8 +286,12 @@ public class Controller implements Initializable {
         fieldCaption.put("site", "siteId");
         fieldCaption.put("ip address", "ipAddress");
         fieldCaption.put("Comment", "comment");
+        fieldCaption.put("bridge basics", "bridge_basics");
+        fieldCaption.put("scheduler profile 10", "scheduler_profile10");
+        fieldCaption.put("interface", "interface_ethernet_status");
+//        fieldCaption.put("bridge ports", "bridge_ports");
         fieldCaption.forEach((k, v) -> {
-            TableColumn<TemperatureModel, String> column = new TableColumn<>(k);
+            TableColumn<VerfyModel, String> column = new TableColumn<>(k);
             column.setId(v + "Col");
             column.setCellValueFactory(new PropertyValueFactory<>(v));
             tableView.getColumns().add(column);
@@ -328,11 +299,11 @@ public class Controller implements Initializable {
 
         if (objectList != null && objectList.size() > 0) {
 
-            ObservableList<TemperatureModel> modelData = FXCollections.observableArrayList();
-            objectList.forEach(mlWrpr -> modelData.add(new TemperatureModel((mlWrpr))));
+            ObservableList<VerfyModel> modelData = FXCollections.observableArrayList();
+            objectList.forEach(mlWrpr -> modelData.add(new VerfyModel((mlWrpr))));
 
             //Filter capability
-            FilteredList<TemperatureModel> filteredData = new FilteredList<>(modelData, p -> true);
+            FilteredList<VerfyModel> filteredData = new FilteredList<>(modelData, p -> true);
             filterTextEntry.textProperty().addListener((observable, oldValue, newValue) ->
                     filteredData.setPredicate(model -> {
                         if (newValue == null || newValue.isEmpty()) {
@@ -349,7 +320,7 @@ public class Controller implements Initializable {
                         return false;
                     }));
 
-            SortedList<TemperatureModel> sortedData = new SortedList<>(filteredData);
+            SortedList<VerfyModel> sortedData = new SortedList<>(filteredData);
             sortedData.comparatorProperty().bind(tableView.comparatorProperty());
             tableView.setItems(sortedData);
 
